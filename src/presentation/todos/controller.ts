@@ -1,10 +1,20 @@
 import { Request, Response } from "express";
+import { prisma } from "../../data/postgres";
 
-const todos = [
-                { id: 1, title: "Todo 1", completed: false, createdAt: new Date() },
-                { id: 2, title: "Todo 2", completed: true, createdAt: new Date() },
-                { id: 3, title: "Todo 3", completed: false, createdAt: new Date() }
-            ];
+export class Todo{
+    public id: number;
+    public text: string;
+    public createdAt: Date;
+    public completedAt:Date | undefined;
+
+    constructor(id: number, text: string, createdAt: Date, completedAt?: Date){
+        this.id = id, 
+        this.text = text, 
+        this.createdAt = createdAt, 
+        this.completedAt = completedAt
+
+    }
+}
 
 export class TodosController{
     
@@ -12,55 +22,95 @@ export class TodosController{
 
     }
 
-    public getTodos = (req: Request, res: Response) => {
-        return res.json(todos);
+    public getTodos = async (req: Request, res: Response) => {
+        
+        const todos = await prisma.todo.findMany();
+
+        const response = todos.map(todo=> {
+            return this.fromObject(todo);
+        });
+
+        return res.json(response);
     };
 
-    public getTodoById = (req: Request, res: Response) => {
+    public getTodoById = async (req: Request, res: Response) => {
         const id = +(!req.params.id ? "0" : req.params.id[0]! );
-        const todo = todos.find(t => t.id === id);
+        const todo = await prisma.todo.findFirst({
+            where: {
+                id: id
+            }
+        });
 
-        (todo)
-        ? res.json(todo)
-        : res.status(404).json({error:"todo not found"});
+        (!todo)
+        ? res.status(404).json({error:"todo not found"})
+        : res.json(todo);
     };
 
-    public createTodo = (req: Request, res: Response) => {
-        const { title, completed } =  req.body;
+    public createTodo = async (req: Request, res: Response) => {
+        const { text } =  req.body;
 
-        todos.push({id: todos.length+1, title, completed, createdAt: new Date()});
-        return res.json( todos );
-    };
+        const newTodo = await prisma.todo.create({
+            data: {
+                text: text
+            }
+        });
+        return res.json( newTodo );
+    }
 
-    public updateTodo = (req: Request, res: Response) => {
+    public updateTodo = async (req: Request, res: Response) => {
         const id = +(!req.params.id ? "0" : req.params.id[0]! );
-        const todo = todos.find(t => t.id === id);
+        const todo = await prisma.todo.findFirst({
+            where: {
+                id: id
+            }});
 
         if(!todo)
         {
             return res.status(404).json({error:"todo not found"});
         }
 
-        const { title, completed } =  req.body;
-         todo.completed = completed || todo.completed;
-         todo.title = title || todo.title;
+        const { text, completedAt = undefined } =  req.body;
+         const newcompletedAt = completedAt || todo.completedAt;
+         const newtext = text || todo.text;
 
-        todo.title = title;
-        res.json(todos);
+         const newTodo = await prisma.todo.update({
+            where:{
+                id: id
+            },
+            data: {
+                completedAt: newcompletedAt,
+                text: newtext
+            }            
+         });
+         console.log({newTodo});
+        res.json(newTodo);
     };
 
-    public deleteTodo = (req: Request, res: Response) => {
+    public deleteTodo = async (req: Request, res: Response) => {
         const id = +(!req.params.id ? "0" : req.params.id[0]! );
-        const todo = todos.find(t => t.id === id);
+        const todo = await prisma.todo.findFirst({
+            where: {
+                id: id
+            }
+        });
 
         if(!todo)
         {
             return res.status(404).json({error:"todo not found"});
         }
 
-        todos.splice(todos.indexOf(todo), 1);
+        await prisma.todo.delete({
+            where: {
+                id: id
+            }
+        });
         res.json(todo);
+    };
 
-    };  
+    fromObject = (obj: { [key: string]: any }): Todo=>{
+        const {id, text, createdAt, completedAt} = obj;
+        
+        return new Todo(id, text, createdAt, completedAt);
+    }
     
 }
