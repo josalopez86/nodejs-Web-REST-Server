@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../../data/postgres";
+import { CreateTodoDto, UpdateTodoDto } from "../../domain/dtos";
 
 export class Todo{
     public id: number;
@@ -46,13 +47,14 @@ export class TodosController{
         : res.json(todo);
     };
 
-    public createTodo = async (req: Request, res: Response) => {
-        const { text } =  req.body;
+    public createTodo = async (req: Request, res: Response) => {        
+        const [error, createToDo] = CreateTodoDto.create(req.body);        
+
+        if(error) return res.status(400).json({error:error});
 
         const newTodo = await prisma.todo.create({
             data: {
-                text: text
-            }
+                text: createToDo.text}
         });
         return res.json( newTodo );
     }
@@ -69,17 +71,17 @@ export class TodosController{
             return res.status(404).json({error:"todo not found"});
         }
 
-        const { text, completedAt = undefined } =  req.body;
-         const newcompletedAt = completedAt || todo.completedAt;
-         const newtext = text || todo.text;
+        const [error, updateTodo] = UpdateTodoDto.create({...req.body, id});
 
+        if(error) return res.status(404).json({error:error});
+         
          const newTodo = await prisma.todo.update({
             where:{
                 id: id
             },
             data: {
-                completedAt: newcompletedAt,
-                text: newtext
+                completedAt: (updateTodo.completedAt === undefined) ? todo.completedAt: updateTodo.completedAt,
+                text: (updateTodo.text === undefined) ? todo.text : updateTodo.text
             }            
          });
          console.log({newTodo});

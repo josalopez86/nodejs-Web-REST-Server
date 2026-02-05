@@ -17,6 +17,8 @@ To reset the database
 `npx prisma migrate reset`
 To migrate changes in schema
 `npx prisma migrate dev --name init`
+To migrate schema to prod
+`npx prisma migrate deploy`
 
 #It was deployed to railway.com/
 https://nodejs-web-rest-server-production.up.railway.app
